@@ -155,16 +155,24 @@ namespace CoffinEscape.Editor
             foreach (XRInteractionGroup group in rig.GetComponentsInChildren<XRInteractionGroup>(true))
                 group.enabled = false;
 
-            ConfigureHand(rig, "Left Controller", XRNode.LeftHand, Key.Digit1, manager, config);
-            ConfigureHand(rig, "Right Controller", XRNode.RightHand, Key.Digit2, manager, config);
+            ConfigureHand(rig, "Left Controller", manager, config);
+            ConfigureHand(rig, "Right Controller", manager, config);
         }
 
-        private static void ConfigureHand(GameObject rig, string handName, XRNode hand, Key debugKey,
-            XRInteractionManager manager, GameConfig config)
+        private static void ConfigureHand(GameObject rig, string handName, XRInteractionManager manager, GameConfig config)
         {
             Transform handTransform = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == handName);
             if (handTransform == null)
                 throw new MissingComponentException($"The XRI rig is missing its {handName}.");
+
+            // The Starter Assets rig already has the correctly bound XRI Select action
+            // for this controller. Preserve it when replacing its Near-Far interactor.
+            XRInputButtonReader selectReader = default;
+            NearFarInteractor existingNearFar = handTransform.GetComponentInChildren<NearFarInteractor>(true);
+            bool hasSelectAction = existingNearFar != null &&
+                                   existingNearFar.selectInput.inputSourceMode == XRInputButtonReader.InputSourceMode.InputActionReference;
+            if (hasSelectAction)
+                selectReader = existingNearFar.selectInput;
 
             foreach (XRBaseInteractor oldInteractor in handTransform.GetComponentsInChildren<XRBaseInteractor>(true))
                 oldInteractor.enabled = false;
@@ -180,15 +188,10 @@ namespace CoffinEscape.Editor
                 direct = handTransform.gameObject.AddComponent<XRDirectInteractor>();
             direct.interactionManager = manager;
 
-            XRInputButtonReader selectReader = direct.selectInput;
-            selectReader.inputSourceMode = XRInputButtonReader.InputSourceMode.ManualValue;
+            if (!hasSelectAction)
+                selectReader = direct.selectInput;
             direct.selectInput = selectReader;
             direct.selectActionTrigger = XRBaseInputInteractor.InputTriggerType.StateChange;
-
-            HandSelectInput handInput = handTransform.GetComponent<HandSelectInput>();
-            if (handInput == null)
-                handInput = handTransform.gameObject.AddComponent<HandSelectInput>();
-            handInput.Configure(direct, hand, config, debugKey);
         }
 
         private static void BuildGrabDemo(Transform parent, ResourceManager resources, GameConfig config,
