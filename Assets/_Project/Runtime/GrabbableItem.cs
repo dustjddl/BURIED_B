@@ -4,29 +4,24 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 namespace CoffinEscape
 {
-    [RequireComponent(typeof(Rigidbody), typeof(XRGrabInteractable))]
+    [RequireComponent(typeof(Rigidbody), typeof(XRGrabInteractable), typeof(ReturnToAnchor))]
     public sealed class GrabbableItem : MonoBehaviour
     {
-        [SerializeField] private Transform returnAnchor;
-        [SerializeField] private BoxCollider movementBounds;
-
         private Rigidbody body;
         private XRGrabInteractable grabInteractable;
-        private Vector3 initialPosition;
-        private Quaternion initialRotation;
+        private ReturnToAnchor returnToAnchor;
+
+        public HandGrabToggle HeldBy { get; private set; }
+        public XRGrabInteractable Interactable => grabInteractable != null ? grabInteractable : GetComponent<XRGrabInteractable>();
+        public ReturnToAnchor ReturnComponent => returnToAnchor != null ? returnToAnchor : GetComponent<ReturnToAnchor>();
 
         private void Awake()
         {
-            body = GetComponent<Rigidbody>();
-            grabInteractable = GetComponent<XRGrabInteractable>();
-            initialPosition = transform.position;
-            initialRotation = transform.rotation;
-
+            CacheComponents();
             body.isKinematic = true;
             body.useGravity = false;
-            body.linearVelocity = Vector3.zero;
-            body.angularVelocity = Vector3.zero;
             grabInteractable.movementType = XRBaseInteractable.MovementType.Kinematic;
+            grabInteractable.selectMode = InteractableSelectMode.Single;
             grabInteractable.selectExited.AddListener(OnReleased);
         }
 
@@ -36,48 +31,42 @@ namespace CoffinEscape
                 grabInteractable.selectExited.RemoveListener(OnReleased);
         }
 
-        public void SetReturnAnchor(Transform anchor) => returnAnchor = anchor;
-        public void SetMovementBounds(BoxCollider bounds) => movementBounds = bounds;
+        public bool CanBeGrabbed =>
+            isActiveAndEnabled && Interactable != null && Interactable.isActiveAndEnabled &&
+            HeldBy == null && Interactable.interactorsSelecting.Count == 0;
 
-        private void LateUpdate()
+        public bool TrySetHolder(HandGrabToggle holder)
         {
-            if (movementBounds == null || grabInteractable == null || !grabInteractable.isSelected)
-                return;
+            if (holder == null || !CanBeGrabbed)
+                return false;
 
-            Collider itemCollider = GetComponent<Collider>();
-            if (itemCollider == null)
-                return;
+            HeldBy = holder;
+            return true;
+        }
 
-            Bounds bounds = movementBounds.bounds;
-            Vector3 extents = itemCollider.bounds.extents;
-            Vector3 position = transform.position;
-            position.x = ClampInside(position.x, bounds.min.x + extents.x, bounds.max.x - extents.x, bounds.center.x);
-            position.y = ClampInside(position.y, bounds.min.y + extents.y, bounds.max.y - extents.y, bounds.center.y);
-            position.z = ClampInside(position.z, bounds.min.z + extents.z, bounds.max.z - extents.z, bounds.center.z);
-            transform.position = position;
+        public void ClearHolder(HandGrabToggle holder)
+        {
+            if (HeldBy == holder)
+                HeldBy = null;
         }
 
         public void ReturnHome()
         {
-            Vector3 position = returnAnchor != null ? returnAnchor.position : initialPosition;
-            Quaternion rotation = returnAnchor != null ? returnAnchor.rotation : initialRotation;
-            body.position = position;
-            body.rotation = rotation;
-            transform.SetPositionAndRotation(position, rotation);
-            body.linearVelocity = Vector3.zero;
-            body.angularVelocity = Vector3.zero;
+            ClearHolder(HeldBy);
+            ReturnComponent?.ReturnHome();
         }
 
         private void OnReleased(SelectExitEventArgs _)
         {
-            // XRI 3.3 sends the exit event after the final hand releases the object.
-            if (grabInteractable.interactorsSelecting.Count == 0)
+            if (Interactable.interactorsSelecting.Count == 0)
                 ReturnHome();
         }
 
-        private static float ClampInside(float value, float minimum, float maximum, float center)
+        private void CacheComponents()
         {
-            return minimum <= maximum ? Mathf.Clamp(value, minimum, maximum) : center;
+            body = GetComponent<Rigidbody>();
+            grabInteractable = GetComponent<XRGrabInteractable>();
+            returnToAnchor = GetComponent<ReturnToAnchor>();
         }
     }
 }

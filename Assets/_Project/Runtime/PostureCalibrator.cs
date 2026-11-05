@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR;
 using Unity.XR.CoreUtils;
+using System.Collections;
 
 namespace CoffinEscape
 {
@@ -9,15 +10,31 @@ namespace CoffinEscape
     {
         [SerializeField] private XROrigin origin;
         [SerializeField] private Transform headAnchor;
+        [SerializeField] private GameConfig config;
         [SerializeField] private bool calibrateOnStart = true;
-        [SerializeField] private Key debugCalibrateKey = Key.F5;
 
         private bool leftPrimaryWasPressed;
 
-        private void Start()
+        public void Configure(XROrigin targetOrigin, Transform targetHeadAnchor, GameConfig gameConfig)
         {
-            if (calibrateOnStart)
-                Calibrate();
+            origin = targetOrigin;
+            headAnchor = targetHeadAnchor;
+            config = gameConfig;
+        }
+
+        private IEnumerator Start()
+        {
+            if (!calibrateOnStart)
+                yield break;
+
+            int delayFrames = config != null ? Mathf.Max(0, config.startupCalibrationDelayFrames) : 0;
+            for (int frame = 0; frame < delayFrames; frame++)
+                yield return null;
+
+            // XR runtimes can apply the first tracked HMD pose after MonoBehaviour.Start.
+            // Recenter after those initial pose updates so the player starts inside the coffin.
+            yield return new WaitForEndOfFrame();
+            Calibrate();
         }
 
         private void Update()
@@ -26,7 +43,8 @@ namespace CoffinEscape
             bool pressedThisFrame = primaryPressed && !leftPrimaryWasPressed;
             leftPrimaryWasPressed = primaryPressed;
 
-            if (pressedThisFrame || (Keyboard.current != null && Keyboard.current[debugCalibrateKey].wasPressedThisFrame))
+            Key debugKey = config != null ? config.debugCalibrateKey : Key.R;
+            if (pressedThisFrame || (Keyboard.current != null && Keyboard.current[debugKey].wasPressedThisFrame))
                 Calibrate();
         }
 

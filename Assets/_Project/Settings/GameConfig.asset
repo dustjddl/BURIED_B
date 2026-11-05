@@ -27,13 +27,48 @@ MonoBehaviour:
   puzzleProgressStressReduction: 10
   lighterStressRecoveryPerSecond: 0.5
   lighterLightIntensity: 1.5
+  coffinWallColor: {r: 0.24, g: 0.27, b: 0.32, a: 1}
+  coffinFloorColor: {r: 0.16, g: 0.18, b: 0.22, a: 1}
+  coffinLidColor: {r: 0.29, g: 0.31, b: 0.35, a: 1}
+  testCubeColor: {r: 0.42, g: 0.66, b: 0.84, a: 1}
+  testSphereColor: {r: 0.82, g: 0.48, b: 0.34, a: 1}
+  lighterBodyColor: {r: 0.91, g: 0.66, b: 0.28, a: 1}
+  cameraBoundaryMarginMeters: 0.06
+  controllerBoundaryMarginMeters: 0.04
+  xrHardwareDetectionTimeoutSeconds: 2
   coffinLengthMeters: 2
   coffinWidthMeters: 0.7
   coffinHeightMeters: 0.6
   coffinWallThicknessMeters: 0.04
   cameraAnchorHeightMeters: 0.25
   headAnchorForwardMeters: 0.18
-  handInteractorRadiusMeters: 0.035
+  handInteractorRadiusMeters: 0.07
+  grabSelectionRadiusMeters: 0.18
+  controllerTipRadiusMeters: 0.012
+  controllerTipLocalPositionMeters: {x: 0, y: 0, z: 0.08}
+  controllerHandLocalPositionMeters: {x: 0, y: -0.025, z: 0.055}
+  controllerHandPalmSizeMeters: {x: 0.075, y: 0.035, z: 0.085}
+  controllerHandFingerLengthMeters: 0.055
+  controllerHandFingerThicknessMeters: 0.012
+  controllerHandFingerCurlDegrees: 75
+  controllerHandColor: {r: 0.76, g: 0.58, b: 0.42, a: 1}
+  controllerButtonThreshold: 0.5
+  emptyGrabHapticAmplitude: 0.12
+  contactHapticDurationSeconds: 0.05
+  wallContactHapticAmplitude: 0.08
   grabTestObjectSizeMeters: 0.1
+  cubeTestObjectPositionMeters: {x: -0.16, y: 0.22, z: 0.66}
+  sphereTestObjectPositionMeters: {x: 0.16, y: 0.22, z: 0.66}
   grabTestObjectPositionMeters: {x: 0.14, y: 0.27, z: 0.72}
-  ambientIntensity: 0.035
+  lighterScaleMeters: {x: 0.045, y: 0.12, z: 0.045}
+  lighterFlameLocalPositionMeters: {x: 0, y: 0.06, z: 0}
+  lighterReturnAnchorLocalPositionMeters: {x: 0.05, y: 0.3, z: 0.5}
+  lighterStartHand: 5
+  leftHandDebugGripKey: 31
+  rightHandDebugGripKey: 19
+  debugTriggerKey: 34
+  debugCalibrateKey: 32
+  startupCalibrationDelayFrames: 2
+  lighterLightRangeMeters: 1.3
+  ambientIntensity: 0.15
+  grayboxColor: {r: 0.42, g: 0.42, b: 0.42, a: 1}

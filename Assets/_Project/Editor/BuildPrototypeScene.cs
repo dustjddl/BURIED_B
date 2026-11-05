@@ -20,6 +20,7 @@ namespace CoffinEscape.Editor
     {
         private const string ScenePath = "Assets/_Project/Scenes/CoffinEscapePrototype.unity";
         private const string ConfigPath = "Assets/_Project/Settings/GameConfig.asset";
+        private const string VisualCatalogPath = "Assets/_Project/Settings/VisualCatalog.asset";
         private const string XrRigPrefabPath = "Assets/Samples/XR Interaction Toolkit/3.3.2/Starter Assets/Prefabs/XR Origin (XR Rig).prefab";
         private const string SimulatorPrefabPath = "Assets/Samples/XR Interaction Toolkit/3.3.2/XR Interaction Simulator/XR Interaction Simulator.prefab";
 
@@ -73,16 +74,21 @@ namespace CoffinEscape.Editor
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             GameConfig config = LoadOrCreateConfig();
+            VisualCatalog visualCatalog = LoadOrCreateVisualCatalog();
+            EnsureTag("ControllerTip");
+            EnsureTag("CoffinWall");
             GameObject root = new GameObject("Coffin Escape Prototype");
             GameObject environment = Child(root.transform, "Coffin");
             Material gray = CreateGrayboxMaterial(config);
-            BoxCollider movementBounds = BuildCoffin(environment.transform, config, gray);
+            BoxCollider movementBounds = BuildCoffin(environment.transform, config, gray, visualCatalog);
 
             var managerObject = new GameObject("Game Systems");
             managerObject.transform.SetParent(root.transform, false);
             var interactionManager = managerObject.AddComponent<XRInteractionManager>();
             var resources = managerObject.AddComponent<ResourceManager>();
             resources.Initialize(config);
+
+            GrabbableItem lighter = BuildGrabDemo(environment.transform, resources, config, gray, movementBounds, visualCatalog);
 
             GameObject rig = (GameObject)PrefabUtility.InstantiatePrefab(rigPrefab, scene);
             rig.name = "XR Origin (Coffin Escape)";
@@ -98,15 +104,18 @@ namespace CoffinEscape.Editor
                 origin.Camera.backgroundColor = Color.black;
             }
 
-            ConfigureHands(rig, interactionManager, config);
+            ConfigureHands(rig, interactionManager, config, lighter, visualCatalog, gray);
             var calibrator = rig.AddComponent<PostureCalibrator>();
-            SetObjectReference(calibrator, "origin", origin);
-            SetObjectReference(calibrator, "headAnchor", environment.transform.Find("Calibration Anchor"));
+            calibrator.Configure(origin, environment.transform.Find("Calibration Anchor"), config);
+            var boundaryConstraint = rig.AddComponent<CoffinBoundaryConstraint>();
+            Transform leftController = rig.GetComponentsInChildren<Transform>(true).First(t => t.name == "Left Controller");
+            Transform rightController = rig.GetComponentsInChildren<Transform>(true).First(t => t.name == "Right Controller");
+            boundaryConstraint.Configure(origin, movementBounds, new[] { leftController, rightController }, config);
 
             GameObject simulator = (GameObject)PrefabUtility.InstantiatePrefab(simulatorPrefab, scene);
             simulator.name = "XR Device Simulator (Keyboard and Mouse)";
+            simulator.AddComponent<XrSimulatorHardwareGate>().Configure(config);
 
-            BuildGrabDemo(environment.transform, resources, config, gray, movementBounds);
             ConfigureLighting(config);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -117,7 +126,7 @@ namespace CoffinEscape.Editor
             Debug.Log($"Coffin Escape prototype scene created at {ScenePath}");
         }
 
-        private static BoxCollider BuildCoffin(Transform parent, GameConfig config, Material material)
+        private static BoxCollider BuildCoffin(Transform parent, GameConfig config, Material material, VisualCatalog visualCatalog)
         {
             float length = config.coffinLengthMeters;
             float width = config.coffinWidthMeters;
@@ -125,16 +134,16 @@ namespace CoffinEscape.Editor
             float wall = config.coffinWallThicknessMeters;
             float outsideWidth = width + wall * 2f;
 
-            Cube("Coffin Floor", parent, new Vector3(0f, -wall * 0.5f, length * 0.5f), new Vector3(outsideWidth, wall, length), material);
-            Cube("Left Wall", parent, new Vector3(-width * 0.5f - wall * 0.5f, height * 0.5f, length * 0.5f), new Vector3(wall, height, length), material);
-            Cube("Right Wall", parent, new Vector3(width * 0.5f + wall * 0.5f, height * 0.5f, length * 0.5f), new Vector3(wall, height, length), material);
-            Cube("Head Wall", parent, new Vector3(0f, height * 0.5f, -wall * 0.5f), new Vector3(outsideWidth, height, wall), material);
-            Cube("Foot Wall", parent, new Vector3(0f, height * 0.5f, length + wall * 0.5f), new Vector3(outsideWidth, height, wall), material);
+            BoxPanel("Coffin Floor", parent, new Vector3(0f, -wall * 0.5f, length * 0.5f), new Vector3(outsideWidth, wall, length), material, visualCatalog.coffinPanelPrefab, config.coffinFloorColor);
+            BoxPanel("Left Wall", parent, new Vector3(-width * 0.5f - wall * 0.5f, height * 0.5f, length * 0.5f), new Vector3(wall, height, length), material, visualCatalog.coffinPanelPrefab, config.coffinWallColor);
+            BoxPanel("Right Wall", parent, new Vector3(width * 0.5f + wall * 0.5f, height * 0.5f, length * 0.5f), new Vector3(wall, height, length), material, visualCatalog.coffinPanelPrefab, config.coffinWallColor);
+            BoxPanel("Head Wall", parent, new Vector3(0f, height * 0.5f, -wall * 0.5f), new Vector3(outsideWidth, height, wall), material, visualCatalog.coffinPanelPrefab, config.coffinWallColor);
+            BoxPanel("Foot Wall", parent, new Vector3(0f, height * 0.5f, length + wall * 0.5f), new Vector3(outsideWidth, height, wall), material, visualCatalog.coffinPanelPrefab, config.coffinWallColor);
 
             GameObject hinge = Child(parent, "Lid Hinge");
             hinge.transform.position = new Vector3(-outsideWidth * 0.5f, height + wall * 0.5f, length * 0.5f);
-            Cube("Lid", hinge.transform, new Vector3(outsideWidth * 0.5f, 0f, 0f),
-                new Vector3(outsideWidth, wall, length), material);
+            BoxPanel("Lid", hinge.transform, new Vector3(outsideWidth * 0.5f, 0f, 0f),
+                new Vector3(outsideWidth, wall, length), material, visualCatalog.coffinPanelPrefab, config.coffinLidColor);
 
             GameObject anchor = Child(parent, "Calibration Anchor");
             anchor.transform.position = new Vector3(0f, config.cameraAnchorHeightMeters, config.headAnchorForwardMeters);
@@ -148,34 +157,41 @@ namespace CoffinEscape.Editor
             return bounds;
         }
 
-        private static void ConfigureHands(GameObject rig, XRInteractionManager manager, GameConfig config)
+        private static void ConfigureHands(GameObject rig, XRInteractionManager manager, GameConfig config,
+            GrabbableItem initialLighter, VisualCatalog visualCatalog, Material handMaterial)
         {
             foreach (LocomotionProvider locomotion in rig.GetComponentsInChildren<LocomotionProvider>(true))
                 locomotion.enabled = false;
             foreach (XRInteractionGroup group in rig.GetComponentsInChildren<XRInteractionGroup>(true))
                 group.enabled = false;
 
-            ConfigureHand(rig, "Left Controller", manager, config);
-            ConfigureHand(rig, "Right Controller", manager, config);
+            ConfigureHand(rig, "Left Controller", XRNode.LeftHand, manager, config, visualCatalog, handMaterial,
+                config.lighterStartHand == XRNode.LeftHand ? initialLighter : null);
+            ConfigureHand(rig, "Right Controller", XRNode.RightHand, manager, config, visualCatalog, handMaterial,
+                config.lighterStartHand == XRNode.RightHand ? initialLighter : null);
         }
 
-        private static void ConfigureHand(GameObject rig, string handName, XRInteractionManager manager, GameConfig config)
+        private static void ConfigureHand(GameObject rig, string handName, XRNode hand, XRInteractionManager manager,
+            GameConfig config, VisualCatalog visualCatalog, Material handMaterial, GrabbableItem initialItem)
         {
             Transform handTransform = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == handName);
             if (handTransform == null)
                 throw new MissingComponentException($"The XRI rig is missing its {handName}.");
 
-            // The Starter Assets rig already has the correctly bound XRI Select action
-            // for this controller. Preserve it when replacing its Near-Far interactor.
-            XRInputButtonReader selectReader = default;
             NearFarInteractor existingNearFar = handTransform.GetComponentInChildren<NearFarInteractor>(true);
-            bool hasSelectAction = existingNearFar != null &&
-                                   existingNearFar.selectInput.inputSourceMode == XRInputButtonReader.InputSourceMode.InputActionReference;
-            if (hasSelectAction)
-                selectReader = existingNearFar.selectInput;
+            InputActionReference gripAction = existingNearFar != null ? ReadActionReference(existingNearFar.selectInput) : null;
+            InputActionReference triggerAction = existingNearFar != null ? ReadActionReference(existingNearFar.activateInput) : null;
+
+            XRDirectInteractor direct = handTransform.GetComponent<XRDirectInteractor>();
+            if (direct == null)
+                direct = handTransform.gameObject.AddComponent<XRDirectInteractor>();
 
             foreach (XRBaseInteractor oldInteractor in handTransform.GetComponentsInChildren<XRBaseInteractor>(true))
-                oldInteractor.enabled = false;
+            {
+                if (oldInteractor != direct)
+                    oldInteractor.enabled = false;
+            }
+            direct.enabled = true;
 
             SphereCollider collider = handTransform.GetComponent<SphereCollider>();
             if (collider == null)
@@ -183,32 +199,67 @@ namespace CoffinEscape.Editor
             collider.radius = config.handInteractorRadiusMeters;
             collider.isTrigger = true;
 
-            XRDirectInteractor direct = handTransform.GetComponent<XRDirectInteractor>();
-            if (direct == null)
-                direct = handTransform.gameObject.AddComponent<XRDirectInteractor>();
-            direct.interactionManager = manager;
+            Rigidbody handBody = handTransform.GetComponent<Rigidbody>();
+            if (handBody == null)
+                handBody = handTransform.gameObject.AddComponent<Rigidbody>();
+            handBody.isKinematic = true;
+            handBody.useGravity = false;
 
-            if (!hasSelectAction)
-                selectReader = direct.selectInput;
-            direct.selectInput = selectReader;
+            direct.interactionManager = manager;
+            XRInputButtonReader disabledSelect = direct.selectInput;
+            disabledSelect.inputSourceMode = XRInputButtonReader.InputSourceMode.Unused;
+            direct.selectInput = disabledSelect;
+            XRInputButtonReader disabledActivate = direct.activateInput;
+            disabledActivate.inputSourceMode = XRInputButtonReader.InputSourceMode.Unused;
+            direct.activateInput = disabledActivate;
+
             direct.selectActionTrigger = XRBaseInputInteractor.InputTriggerType.StateChange;
+
+            Transform tip = handTransform.Find("ControllerTip");
+            if (tip == null)
+                tip = Child(handTransform, "ControllerTip").transform;
+            tip.localPosition = config.controllerTipLocalPositionMeters;
+            tip.localRotation = Quaternion.identity;
+            tip.localScale = Vector3.one;
+            tip.gameObject.tag = "ControllerTip";
+            SphereCollider tipCollider = tip.GetComponent<SphereCollider>();
+            if (tipCollider == null)
+                tipCollider = tip.gameObject.AddComponent<SphereCollider>();
+            tipCollider.radius = config.controllerTipRadiusMeters;
+            tipCollider.isTrigger = true;
+
+            ControllerWallHaptics wallHaptics = handTransform.GetComponent<ControllerWallHaptics>();
+            if (wallHaptics == null)
+                wallHaptics = handTransform.gameObject.AddComponent<ControllerWallHaptics>();
+            wallHaptics.Configure(direct, config);
+
+            HandGrabToggle grabToggle = handTransform.GetComponent<HandGrabToggle>();
+            if (grabToggle == null)
+                grabToggle = handTransform.gameObject.AddComponent<HandGrabToggle>();
+            grabToggle.Configure(direct, hand, config, gripAction, triggerAction, initialItem);
+
+            Transform controllerVisual = handTransform.Find(handName + " Visual");
+            ControllerHandVisual handVisual = handTransform.GetComponent<ControllerHandVisual>();
+            if (handVisual == null)
+                handVisual = handTransform.gameObject.AddComponent<ControllerHandVisual>();
+            handVisual.Configure(grabToggle, hand, config, handMaterial, visualCatalog.controllerHandPrefab, controllerVisual);
         }
 
-        private static void BuildGrabDemo(Transform parent, ResourceManager resources, GameConfig config,
-            Material material, BoxCollider movementBounds)
+        private static GrabbableItem BuildGrabDemo(Transform parent, ResourceManager resources, GameConfig config,
+            Material material, BoxCollider movementBounds, VisualCatalog visualCatalog)
         {
-            GameObject lighter = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            lighter.name = "Lighter (M2 Interaction Demo)";
-            lighter.transform.SetParent(parent, false);
-            lighter.transform.localPosition = config.grabTestObjectPositionMeters;
-            lighter.transform.localScale = config.lighterScaleMeters;
-            lighter.GetComponent<Renderer>().sharedMaterial = material;
-            Rigidbody lighterBody = lighter.AddComponent<Rigidbody>();
-            lighterBody.isKinematic = true;
-            lighterBody.useGravity = false;
-            XRGrabInteractable lighterGrab = lighter.AddComponent<XRGrabInteractable>();
-            lighterGrab.movementType = XRBaseInteractable.MovementType.Kinematic;
-            GrabbableItem lighterHome = lighter.AddComponent<GrabbableItem>();
+            CreateGrabObject("Cube (M2 Grab Test)", parent, config.cubeTestObjectPositionMeters,
+                Vector3.one * config.grabTestObjectSizeMeters, PrimitiveType.Cube, visualCatalog.cubePickupPrefab,
+                material, config.testCubeColor, movementBounds, config.cubeTestObjectPositionMeters, "Cube Return Anchor");
+            CreateGrabObject("Sphere (M2 Grab Test)", parent, config.sphereTestObjectPositionMeters,
+                Vector3.one * config.grabTestObjectSizeMeters, PrimitiveType.Sphere, visualCatalog.spherePickupPrefab,
+                material, config.testSphereColor, movementBounds, config.sphereTestObjectPositionMeters, "Sphere Return Anchor");
+
+            GrabbableItem lighterHome = CreateGrabObject("Lighter (M2 Interaction Demo)", parent,
+                config.grabTestObjectPositionMeters, config.lighterScaleMeters, PrimitiveType.Cube,
+                visualCatalog.lighterPrefab, material, config.lighterBodyColor, movementBounds, config.lighterReturnAnchorLocalPositionMeters,
+                "Lighter Return Anchor");
+            GameObject lighter = lighterHome.gameObject;
 
             GameObject flameObject = new GameObject("Flame");
             flameObject.transform.SetParent(lighter.transform, false);
@@ -221,11 +272,46 @@ namespace CoffinEscape.Editor
             LighterController lighterController = lighter.AddComponent<LighterController>();
             lighterController.Configure(flame, resources, config);
 
-            Transform homeAnchor = Child(parent, "Lighter Return Anchor").transform;
-            homeAnchor.localPosition = config.grabTestObjectPositionMeters;
-            homeAnchor.localRotation = Quaternion.identity;
-            lighterHome.SetReturnAnchor(homeAnchor);
-            lighterHome.SetMovementBounds(movementBounds);
+            lighterHome.ReturnComponent.Configure(parent.Find("Lighter Return Anchor"), movementBounds);
+            return lighterHome;
+        }
+
+        private static GrabbableItem CreateGrabObject(string name, Transform parent, Vector3 localPosition,
+            Vector3 localScale, PrimitiveType fallbackPrimitive, GameObject visualPrefab, Material fallbackMaterial,
+            Color visualColor, BoxCollider movementBounds, Vector3 returnAnchorLocalPosition, string returnAnchorName)
+        {
+            GameObject itemObject = new GameObject(name);
+            itemObject.transform.SetParent(parent, false);
+            itemObject.transform.localPosition = localPosition;
+            itemObject.transform.localScale = localScale;
+
+            if (fallbackPrimitive == PrimitiveType.Sphere)
+                itemObject.AddComponent<SphereCollider>();
+            else
+                itemObject.AddComponent<BoxCollider>();
+
+            Rigidbody body = itemObject.AddComponent<Rigidbody>();
+            body.isKinematic = true;
+            body.useGravity = false;
+
+            XRGrabInteractable interactable = itemObject.AddComponent<XRGrabInteractable>();
+            interactable.movementType = XRBaseInteractable.MovementType.Kinematic;
+            interactable.selectMode = InteractableSelectMode.Single;
+
+            ApplyVisualColor(CreateVisual(itemObject.transform, visualPrefab, fallbackPrimitive, fallbackMaterial), visualColor);
+
+            Transform anchor = Child(parent, returnAnchorName).transform;
+            anchor.localPosition = returnAnchorLocalPosition;
+            anchor.localRotation = Quaternion.identity;
+
+            ReturnToAnchor returnComponent = itemObject.AddComponent<ReturnToAnchor>();
+            returnComponent.Configure(anchor, movementBounds);
+            return itemObject.AddComponent<GrabbableItem>();
+        }
+
+        private static void ApplyVisualColor(GameObject visualRoot, Color color)
+        {
+            visualRoot.AddComponent<VisualTint>().Configure(color);
         }
 
         private static GameConfig LoadOrCreateConfig()
@@ -261,15 +347,86 @@ namespace CoffinEscape.Editor
             return material;
         }
 
-        private static GameObject Cube(string name, Transform parent, Vector3 localPosition, Vector3 localScale, Material material)
+        private static GameObject BoxPanel(string name, Transform parent, Vector3 localPosition, Vector3 localScale,
+            Material fallbackMaterial, GameObject visualPrefab, Color visualColor)
         {
-            GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cube.name = name;
-            cube.transform.SetParent(parent, false);
-            cube.transform.localPosition = localPosition;
-            cube.transform.localScale = localScale;
-            cube.GetComponent<Renderer>().sharedMaterial = material;
-            return cube;
+            GameObject panel = new GameObject(name);
+            panel.transform.SetParent(parent, false);
+            panel.transform.localPosition = localPosition;
+            panel.transform.localScale = localScale;
+            BoxCollider collider = panel.AddComponent<BoxCollider>();
+            collider.size = Vector3.one;
+            panel.tag = "CoffinWall";
+            ApplyVisualColor(CreateVisual(panel.transform, visualPrefab, PrimitiveType.Cube, fallbackMaterial), visualColor);
+            return panel;
+        }
+
+        private static GameObject CreateVisual(Transform parent, GameObject visualPrefab,
+            PrimitiveType fallbackPrimitive, Material fallbackMaterial)
+        {
+            GameObject visualRoot = Child(parent, "Visual");
+            if (visualPrefab != null)
+            {
+                GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(visualPrefab);
+                instance.transform.SetParent(visualRoot.transform, false);
+                foreach (Collider visualCollider in instance.GetComponentsInChildren<Collider>(true))
+                    Object.DestroyImmediate(visualCollider);
+                foreach (Rigidbody visualBody in instance.GetComponentsInChildren<Rigidbody>(true))
+                    Object.DestroyImmediate(visualBody);
+            }
+            else
+            {
+                GameObject primitive = GameObject.CreatePrimitive(fallbackPrimitive);
+                primitive.name = fallbackPrimitive.ToString();
+                primitive.transform.SetParent(visualRoot.transform, false);
+                Collider primitiveCollider = primitive.GetComponent<Collider>();
+                if (primitiveCollider != null)
+                    Object.DestroyImmediate(primitiveCollider);
+                foreach (Renderer renderer in primitive.GetComponentsInChildren<Renderer>(true))
+                    renderer.sharedMaterial = fallbackMaterial;
+            }
+
+            return visualRoot;
+        }
+
+        private static InputActionReference ReadActionReference(XRInputButtonReader reader)
+        {
+            return reader != null && reader.inputSourceMode == XRInputButtonReader.InputSourceMode.InputActionReference
+                ? reader.inputActionReferencePerformed
+                : null;
+        }
+
+        private static VisualCatalog LoadOrCreateVisualCatalog()
+        {
+            VisualCatalog catalog = AssetDatabase.LoadAssetAtPath<VisualCatalog>(VisualCatalogPath);
+            if (catalog != null)
+                return catalog;
+
+            catalog = ScriptableObject.CreateInstance<VisualCatalog>();
+            AssetDatabase.CreateAsset(catalog, VisualCatalogPath);
+            EditorUtility.SetDirty(catalog);
+            AssetDatabase.SaveAssets();
+            return catalog;
+        }
+
+        private static void EnsureTag(string tag)
+        {
+            Object tagManagerAsset = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset").FirstOrDefault();
+            if (tagManagerAsset == null)
+                throw new System.InvalidOperationException("Unity TagManager.asset could not be loaded.");
+
+            SerializedObject serialized = new SerializedObject(tagManagerAsset);
+            SerializedProperty tags = serialized.FindProperty("tags");
+            for (int index = 0; index < tags.arraySize; index++)
+            {
+                if (tags.GetArrayElementAtIndex(index).stringValue == tag)
+                    return;
+            }
+
+            int newIndex = tags.arraySize;
+            tags.InsertArrayElementAtIndex(newIndex);
+            tags.GetArrayElementAtIndex(newIndex).stringValue = tag;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static GameObject Child(Transform parent, string name)
@@ -314,11 +471,5 @@ namespace CoffinEscape.Editor
             }
         }
 
-        private static void SetObjectReference(Object target, string propertyName, Object value)
-        {
-            SerializedObject serialized = new SerializedObject(target);
-            serialized.FindProperty(propertyName).objectReferenceValue = value;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-        }
     }
 }
