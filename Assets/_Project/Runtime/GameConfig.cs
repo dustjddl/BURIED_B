@@ -40,6 +40,20 @@ namespace CoffinEscape
         [Min(0f)] public float xrHardwareDetectionTimeoutSeconds = 2f;
 
         [Header("Prototype scene")]
+        [Header("M3 puzzle tuning")]
+        [Min(0.01f)] public float clueReadDistanceMeters = 0.95f;
+        [Min(0f)] public float dialButtonCooldownSeconds = 0.3f;
+        [Min(0f)] public float oilFuelBonusSeconds = 120f;
+        [Min(0f)] public float lockLidOpenSeconds = 0.8f;
+        [Range(0f, 180f)] public float lockLidOpenAngleDegrees = 100f;
+        [Min(0.01f)] public float puzzleItemSizeMeters = 0.12f;
+        [Min(0.01f)] public float tinCanSizeMeters = 0.25f;
+        public Vector3 pileAPositionMeters = new Vector3(-0.17f, 0.08f, 1.72f);
+        public Vector3 pileBPositionMeters = new Vector3(0.17f, 0.08f, 1.72f);
+        public Vector3 tinCanPositionMeters = new Vector3(0.25f, 0.2f, 1.1f);
+        public Key debugRegenerateRunKey = Key.F5;
+        public Key debugRevealAnswersKey = Key.F6;
+
         [Min(0.1f)] public float coffinLengthMeters = 2f;
         [Min(0.1f)] public float coffinWidthMeters = 0.7f;
         [Min(0.1f)] public float coffinHeightMeters = 0.6f;

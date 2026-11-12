@@ -189,5 +189,11 @@ namespace CoffinEscape
             if (interactor != null && amplitude > 0f && config != null)
                 interactor.SendHapticImpulse(amplitude, config.contactHapticDurationSeconds);
         }
+
+        public void PulseContact(float amplitude, float duration = -1f)
+        {
+            if (interactor != null && amplitude > 0f)
+                interactor.SendHapticImpulse(amplitude, duration >= 0f ? duration : config != null ? config.contactHapticDurationSeconds : 0.05f);
+        }
     }
 }

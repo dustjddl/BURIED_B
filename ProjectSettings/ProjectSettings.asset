@@ -912,7 +912,13 @@ PlayerSettings:
   XboxOneOverrideIdentityName: 
   XboxOneOverrideIdentityPublisher: 
   vrEditorSettings: {}
-  cloudServicesEnabled: {}
+  cloudServicesEnabled:
+    Build: 0
+    Game Performance: 0
+    Legacy Analytics: 0
+    Purchasing: 0
+    UDP: 0
+    Unity Ads: 0
   luminIcon:
     m_Name: 
     m_ModelFolderPath: 
@@ -934,11 +940,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 1
   windowsGamepadBackendHint: 0
-  cloudProjectId: afc27825-183d-4494-8744-a411815ac98a
+  cloudProjectId: 94a5e486-435d-43a7-bf12-3324b57eddec
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: BURIED 2026-06-19_04-06-22
-  organizationId: cvrexz556
+  projectName: BURIED
+  organizationId: dltjddus301
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}

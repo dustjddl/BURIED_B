@@ -1,4 +1,5 @@
 using System.IO;
+using TMPro;
 using System.Linq;
 using CoffinEscape;
 using UnityEditor;
@@ -75,6 +76,11 @@ namespace CoffinEscape.Editor
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             GameConfig config = LoadOrCreateConfig();
             VisualCatalog visualCatalog = LoadOrCreateVisualCatalog();
+            if (visualCatalog.lighterPrefab == null)
+            {
+                visualCatalog.lighterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/devotid/Lighter/Prefabs/Lighter_Prefab.prefab");
+                EditorUtility.SetDirty(visualCatalog);
+            }
             EnsureTag("ControllerTip");
             EnsureTag("CoffinWall");
             GameObject root = new GameObject("Coffin Escape Prototype");
@@ -111,6 +117,9 @@ namespace CoffinEscape.Editor
             Transform leftController = rig.GetComponentsInChildren<Transform>(true).First(t => t.name == "Left Controller");
             Transform rightController = rig.GetComponentsInChildren<Transform>(true).First(t => t.name == "Right Controller");
             boundaryConstraint.Configure(origin, movementBounds, new[] { leftController, rightController }, config);
+
+            BuildM3(environment.transform, resources, lighter, config, gray, movementBounds,
+                origin.Camera != null ? origin.Camera.transform : rig.transform);
 
             GameObject simulator = (GameObject)PrefabUtility.InstantiatePrefab(simulatorPrefab, scene);
             simulator.name = "XR Device Simulator (Keyboard and Mouse)";
@@ -274,6 +283,67 @@ namespace CoffinEscape.Editor
 
             lighterHome.ReturnComponent.Configure(parent.Find("Lighter Return Anchor"), movementBounds);
             return lighterHome;
+        }
+
+        private static void BuildM3(Transform parent, ResourceManager resources, GrabbableItem lighter,
+            GameConfig config, Material material, BoxCollider bounds, Transform reader)
+        {
+            RunData run = RunGenerator.Generate(PlayerPrefs.GetInt("CoffinEscape.RunSeed", 1));
+            Light lighterLight = lighter.GetComponentInChildren<Light>(true);
+            Vector3[] pilePositions={config.pileAPositionMeters,config.pileBPositionMeters};
+            PileContent[] pileContents={run.PileA,run.PileB};
+            for(int i=0;i<2;i++)
+            {
+                GameObject pile=GameObject.CreatePrimitive(PrimitiveType.Cylinder); pile.name=$"P1 Pile {(i==0?"A":"B")}"; pile.transform.SetParent(parent,false); pile.transform.localPosition=pilePositions[i]; pile.transform.localScale=new Vector3(config.puzzleItemSizeMeters*1.5f,config.puzzleItemSizeMeters*.35f,config.puzzleItemSizeMeters*1.5f); pile.GetComponent<Renderer>().sharedMaterial=material; pile.GetComponent<Collider>().isTrigger=true; Rigidbody pileBody=pile.AddComponent<Rigidbody>(); pileBody.isKinematic=true;
+                var touch=pile.AddComponent<PileInteractable>();
+                Vector3 itemPos=pilePositions[i]+Vector3.up*config.puzzleItemSizeMeters;
+                GrabbableItem item=CreateGrabObject(pileContents[i]==PileContent.Photo?"Photo Clue Pickup":"Spare Oil Pickup",parent,itemPos,Vector3.one*config.puzzleItemSizeMeters,PrimitiveType.Cube,null,material,pileContents[i]==PileContent.Photo?config.testCubeColor:config.lighterBodyColor,bounds,itemPos,pileContents[i]+" Return Anchor");
+                touch.Configure(pileContents[i],item,resources,config.oilFuelBonusSeconds);
+                if(pileContents[i]==PileContent.Photo) CreateClue(parent,"Photo Back Clue",ClueLocation.PhotoBack,run.TinLock,lighterLight,config,material,item.transform,reader);
+            }
+            Vector3 tinPos=config.tinCanPositionMeters;
+            GameObject tin=GameObject.CreatePrimitive(PrimitiveType.Cube); tin.name="P2 Tin Can"; tin.transform.SetParent(parent,false); tin.transform.localPosition=tinPos; tin.transform.localScale=Vector3.one*config.tinCanSizeMeters; tin.GetComponent<Renderer>().sharedMaterial=material;
+            var tinLock=tin.AddComponent<CodeLock>();
+            Transform lid=new GameObject("Tin Can Lid Hinge").transform; lid.SetParent(tin.transform,false); lid.localPosition=Vector3.up*.5f;
+            GameObject lidVisual=GameObject.CreatePrimitive(PrimitiveType.Cube); lidVisual.name="Lid"; lidVisual.transform.SetParent(lid,false); lidVisual.transform.localPosition=new Vector3(0,.05f,0); lidVisual.transform.localScale=new Vector3(1.02f,.12f,1.02f); lidVisual.GetComponent<Renderer>().sharedMaterial=material; Object.DestroyImmediate(lidVisual.GetComponent<Collider>());
+            GameObject[] rewards=new GameObject[2];
+            for(int i=0;i<2;i++){rewards[i]=GameObject.CreatePrimitive(i==0?PrimitiveType.Cube:PrimitiveType.Sphere); rewards[i].name=i==0?"P2 Tool":"P4 Talisman"; rewards[i].transform.SetParent(parent,false); rewards[i].transform.localPosition=tinPos+new Vector3((i==0?-.08f:.08f),.08f,0); rewards[i].transform.localScale=Vector3.one*config.puzzleItemSizeMeters; rewards[i].GetComponent<Renderer>().sharedMaterial=material; rewards[i].SetActive(false);}
+            TextMeshPro status=CreateWorldText(tin.transform,"Lock Status",new Vector3(0,.8f,-.52f),config); status.text="LOCKED";
+            TMP_Text[] numbers=new TMP_Text[3];
+            for(int i=0;i<3;i++)
+            {
+                Vector3 slotPos=new Vector3((i-1)*.32f,.5f,-.52f);
+                GameObject symbol=new GameObject("Dial Symbol"); symbol.transform.SetParent(tin.transform,false); symbol.transform.localPosition=slotPos; var view=symbol.AddComponent<SymbolView>(); view.Set(run.TinLock.SymbolAt(i),.16f,material);
+                TextMeshPro number=CreateWorldText(tin.transform,"Dial Number",slotPos+Vector3.up*.18f,config); number.text="0"; numbers[i]=number;
+                CreateDialButton(tin.transform,tinLock,i,1,false,new Vector3(slotPos.x,slotPos.y+.37f,slotPos.z),config);
+                CreateDialButton(tin.transform,tinLock,i,-1,false,new Vector3(slotPos.x,slotPos.y-.27f,slotPos.z),config);
+            }
+            tinLock.Configure(run.TinLock,resources,lid,rewards,config.lockLidOpenSeconds,config.lockLidOpenAngleDegrees,status,numbers);
+            CreateDialButton(tin.transform,tinLock,0,0,true,new Vector3(0,-.2f,-.52f),config);
+            CreateClue(parent,"Right Graffiti 1",ClueLocation.RightGraffiti,run.TinLock,lighterLight,config,material,null,reader);
+            CreateClue(parent,"Left Graffiti 2",ClueLocation.LeftGraffiti,run.TinLock,lighterLight,config,material,null,reader);
+            parent.gameObject.AddComponent<RunDebugControls>().Configure(config,tinLock,run,status);
+        }
+
+        private static void CreateClue(Transform parent,string name,ClueLocation location,CodeRunData data,Light light,GameConfig config,Material symbolMaterial,Transform photo,Transform reader)
+        {
+            int slot=System.Array.IndexOf(data.ClueLocations,location); if(slot<0)return;
+            GameObject clue=new GameObject(name); clue.transform.SetParent(photo!=null?photo:parent,false); clue.transform.localPosition=photo!=null?new Vector3(0,0,-.51f):location==ClueLocation.RightGraffiti?new Vector3(config.coffinWidthMeters*.47f,.26f,.9f):new Vector3(-config.coffinWidthMeters*.47f,.26f,.9f);
+            GameObject mesh=new GameObject("Symbol Mesh"); mesh.transform.SetParent(clue.transform,false); mesh.transform.localPosition=Vector3.left*.07f; var symbol=mesh.AddComponent<SymbolView>(); symbol.Set(data.SymbolAt(slot),.09f,symbolMaterial);
+            TextMeshPro label=CreateWorldText(clue.transform,"Clue Digit",Vector3.right*.07f,config); label.text=data.Digits[slot].ToString();
+            ClueItem item=clue.AddComponent<ClueItem>(); item.Configure(data.SymbolAt(slot),data.Digits[slot],light,reader,config.clueReadDistanceMeters,label);
+        }
+
+        private static TextMeshPro CreateWorldText(Transform parent,string name,Vector3 localPosition,GameConfig config)
+        {
+            GameObject go=new GameObject(name); go.transform.SetParent(parent,false); go.transform.localPosition=localPosition; go.transform.localRotation=Quaternion.identity;
+            var text=go.AddComponent<TextMeshPro>(); text.fontSize=.25f; text.alignment=TextAlignmentOptions.Center; text.color=Color.white; text.rectTransform.sizeDelta=new Vector2(.35f,.2f); return text;
+        }
+
+        private static void CreateDialButton(Transform parent,CodeLock codeLock,int slot,int delta,bool confirm,Vector3 position,GameConfig config)
+        {
+            GameObject button=GameObject.CreatePrimitive(PrimitiveType.Cube); button.name=confirm?"Confirm Button":delta>0?"Dial Up":"Dial Down"; button.transform.SetParent(parent,false); button.transform.localPosition=position; button.transform.localScale=new Vector3(.16f,.1f,.05f); button.GetComponent<Renderer>().sharedMaterial=AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Settings/Graybox.mat");
+            button.AddComponent<DialButton>().Configure(codeLock,slot,delta,confirm,config.dialButtonCooldownSeconds);
         }
 
         private static GrabbableItem CreateGrabObject(string name, Transform parent, Vector3 localPosition,
