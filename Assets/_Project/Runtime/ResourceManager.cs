@@ -16,6 +16,8 @@ namespace CoffinEscape
         public float DarkSeconds { get; private set; }
         public bool IsOxygenDepleted { get; private set; }
         public bool HasFuel => FuelRemaining > 0f;
+        public bool IsPanic => config != null && Stress >= config.panicStressThreshold;
+        public float CurrentOxygenDrainMultiplier { get; private set; } = 1f;
         public GameConfig Config => config;
 
         private void Awake()
@@ -40,7 +42,18 @@ namespace CoffinEscape
             Stress = Mathf.Clamp(config.initialStress, 0f, config.maximumStress);
             DarkSeconds = 0f;
             IsOxygenDepleted = false;
+            CurrentOxygenDrainMultiplier = GetOxygenDrainMultiplier(false);
             ValuesChanged?.Invoke();
+        }
+
+        public float GetOxygenDrainMultiplier(bool lighterLit)
+        {
+            if (config == null)
+                return 1f;
+
+            float lightMultiplier = lighterLit && HasFuel ? config.oxygenMultiplierWhileLighterLit : 1f;
+            float panicMultiplier = IsPanic ? config.panicOxygenMultiplier : 1f;
+            return lightMultiplier * panicMultiplier;
         }
 
         /// <summary>Advances game resources by an injected time step; returns whether the lighter actually burned.</summary>
@@ -70,9 +83,10 @@ namespace CoffinEscape
                     Stress + (stressTimeAfter - stressTimeBefore) * config.darkStressPerSecond);
             }
 
-            float panicMultiplier = Stress >= config.panicStressThreshold ? config.panicOxygenMultiplier : 1f;
+            float panicMultiplier = IsPanic ? config.panicOxygenMultiplier : 1f;
             float oxygenSeconds = darkSeconds + litSeconds * config.oxygenMultiplierWhileLighterLit;
             OxygenRemaining = Mathf.Max(0f, OxygenRemaining - oxygenSeconds * config.oxygenDrainRate * panicMultiplier);
+            CurrentOxygenDrainMultiplier = GetOxygenDrainMultiplier(litSeconds > 0f);
 
             if (OxygenRemaining <= 0f && !IsOxygenDepleted)
             {

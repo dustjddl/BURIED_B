@@ -2,7 +2,8 @@
   "name": "CoffinEscape.EditModeTests",
   "rootNamespace": "CoffinEscape.Tests",
   "references": [
-    "CoffinEscape.Runtime"
+    "CoffinEscape.Runtime",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [
     "Editor"

@@ -7,6 +7,8 @@ namespace CoffinEscape
     {
         [SerializeField] private SymbolId symbol;
         [SerializeField] private float size=0.08f;
+        public float Diameter => size;
+        public SymbolId Symbol => symbol;
         public void Set(SymbolId id,float diameter,Material material=null)
         {
             symbol=id; size=diameter;

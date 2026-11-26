@@ -1,14 +1,16 @@
 ﻿<Solution>
   <Project Path="VG_Scripts.csproj" />
-  <Project Path="Unity.XR.Interaction.Toolkit.Samples.StarterAssets.csproj" />
+  <Project Path="CoffinEscape.EditModeTests.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
-  <Project Path="Gleechi.VirtualGrasp.Onboarding.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="Gleechi.VirtualGrasp.Tests.csproj" />
+  <Project Path="CoffinEscape.Runtime.csproj" />
+  <Project Path="Unity.XR.Interaction.Toolkit.Samples.StarterAssets.csproj" />
+  <Project Path="Gleechi.VirtualGrasp.Onboarding.csproj" />
+  <Project Path="Gleechi.VirtualGrasp.Build.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.InteractionSimulator.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.DeviceSimulator.csproj" />
   <Project Path="Dependencies.csproj" />
-  <Project Path="Gleechi.VirtualGrasp.Build.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.StarterAssets.Editor.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.InteractionSimulator.Editor.csproj" />
   <Project Path="Gleechi.VirtualGrasp.Editor.csproj" />

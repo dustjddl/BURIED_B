@@ -31,6 +31,7 @@ namespace CoffinEscape.Tests
             Assert.That(resources.OxygenRemaining, Is.EqualTo(config.oxygenDurationSeconds));
             Assert.That(resources.FuelRemaining, Is.EqualTo(config.lighterFuelDurationSeconds));
             Assert.That(resources.Stress, Is.EqualTo(config.initialStress));
+            Assert.That(resources.CurrentOxygenDrainMultiplier, Is.EqualTo(1f));
         }
 
         [Test]
@@ -40,6 +41,7 @@ namespace CoffinEscape.Tests
 
             Assert.That(resources.FuelRemaining, Is.EqualTo(config.lighterFuelDurationSeconds - 10f).Within(0.001f));
             Assert.That(resources.OxygenRemaining, Is.EqualTo(config.oxygenDurationSeconds - 10f * config.oxygenMultiplierWhileLighterLit).Within(0.001f));
+            Assert.That(resources.CurrentOxygenDrainMultiplier, Is.EqualTo(config.oxygenMultiplierWhileLighterLit).Within(0.001f));
         }
 
         [Test]
@@ -50,8 +52,10 @@ namespace CoffinEscape.Tests
             resources.ResetResources();
             resources.AdvanceTime(2f, true);
 
-            float expectedDrain = 2f * config.oxygenMultiplierWhileLighterLit * config.panicOxygenMultiplier;
+            float expectedMultiplier = config.oxygenMultiplierWhileLighterLit * config.panicOxygenMultiplier;
+            float expectedDrain = 2f * expectedMultiplier;
             Assert.That(resources.OxygenRemaining, Is.EqualTo(config.oxygenDurationSeconds - expectedDrain).Within(0.001f));
+            Assert.That(resources.CurrentOxygenDrainMultiplier, Is.EqualTo(expectedMultiplier).Within(0.001f));
         }
 
         [Test]
@@ -85,6 +89,16 @@ namespace CoffinEscape.Tests
             Assert.That(resources.FuelRemaining, Is.Zero);
             Assert.That(resources.OxygenRemaining,
                 Is.EqualTo(config.oxygenDurationSeconds - config.lighterFuelDurationSeconds * config.oxygenMultiplierWhileLighterLit - 5f).Within(0.001f));
+            Assert.That(resources.CurrentOxygenDrainMultiplier, Is.EqualTo(1f).Within(0.001f));
+        }
+
+        [Test]
+        public void AddFuelIncreasesRemainingFuel()
+        {
+            float before = resources.FuelRemaining;
+            resources.AddFuel(config.oilFuelBonusSeconds);
+
+            Assert.That(resources.FuelRemaining, Is.EqualTo(before + config.oilFuelBonusSeconds).Within(0.001f));
         }
     }
 }
